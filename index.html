@@ -2,13 +2,60 @@
   <head>
     <title>newbridge-go</title>
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  </head>
-  <body>
-    <script>
-      $(() => {
-        console.log("ready");
+		<script>
+			/*
+			const URL_NEW2ETH = "http://52.199.194.251:8801/v1/bridge/account?direction=new2eth&ethereum_recipient_address=";
+			const URL_ETH2NEW = "http://52.199.194.251:8801/v1/bridge/account?direction=eth2new&newchain_recipient_address=";
+			*/
+			const URL = "http://52.199.194.251:8801/v1/bridge/account";
+
+			function print(msg) {
+				$("<div>").text(msg).appendTo("body");
+			}
+
+			window.addEventListener("load", async () => {
+        print("ready");
+
+				// if metamask is ready
+				if (window.ethereum) {
+					window.web3 = new Web3(ethereum);
+
+					try { // log in
+						await ethereum.enable();
+					} catch (err) { // user denied
+						print("login denied");
+						return; //quit
+					}
+				} else {
+					print("metamask not found");
+					return; // quit
+				}
+
+				// default account
+				var account = web3.eth.defaultAccount;
+				if (account == undefined) {
+					print("metamask not logged in");
+					return; // quit
+				} else {
+					print("address on ethereum: " + account);
+				}
+
+				// go
+				$.ajax({
+					url: URL,
+					data: {
+						ethereum_recipient_address: account,
+						direction: "new2eth"
+					},
+					type: "GET",
+					dataType: "json"
+				}).done((json) => {
+					print(JSON.stringify(json));
+				});
       });
     </script>
+  </head>
+  <body>
   </body>
 </html>
 
