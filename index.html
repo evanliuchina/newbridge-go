@@ -21,22 +21,26 @@
 				"1": {
 					name: "ethereum", //eth main-net
 					url: URL,
-					direction: "new2eth"
+					direction: "new2eth",
+					from_network: 1012
 				},
 				"4": {
 					name: "rinkeby", //rinkeby test-net
 					url: URL_TESTNET,
-					direction: "new2eth"
+					direction: "new2eth",
+					from_network: 1007
 				},
 				"1012": {
 					name: "newchain", //newchain main-net
 					url: URL,
-					direction: "eth2new"
+					direction: "eth2new",
+					from_network: 1
 				},
 				"1007": {
 					name: "newchain_testnet", //newchain test-net
 					url: URL_TESTNET,
-					direction: "eth2new"
+					direction: "eth2new",
+					from_network: 4
 				}
 			};
 
@@ -75,7 +79,8 @@
 				//no default
 
 				var network_to = NETWORK[chain_id].name + "(" + chain_id + ")";
-				console.log(network_to);
+				var network_from = NETWORK[NETWORK[chain_id].from_network].name + "(" + chain_id + ")";
+				$("#network_chain_from").text(network_from);
 				$("#network_chain_to").text(network_to);
 			}
 
@@ -200,6 +205,7 @@
 				<div id="direction" style="align:center; width:450px;">
 					<span id="chain_from" style="float:left">
 						<p id="logo_chain_from"></p>
+						<p id="network_chain_from"></p>
 					</span>
 					<span style="float:left; padding-top:16px;">
 						<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="#20C5A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -209,8 +215,8 @@
 					</span>
 					<span id="chain_to" style="float:left">
 						<p id="logo_chain_to"></p>
-						<p id="address_chain_to"></p>
 						<p id="network_chain_to"></p>
+						<p id="address_chain_to"></p>
 					</span>
 				</div>
 			</div>
