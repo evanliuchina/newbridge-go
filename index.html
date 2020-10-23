@@ -79,7 +79,7 @@
 				//no default
 
 				var network_to = NETWORK[chain_id].name + "(" + chain_id + ")";
-				var network_from = NETWORK[NETWORK[chain_id].from_network].name + "(" + chain_id + ")";
+				var network_from = NETWORK[NETWORK[chain_id].from_network].name + "(" + NETWORK[chain_id].from_network + ")";
 				$("#network_chain_from").text(network_from);
 				$("#network_chain_to").text(network_to);
 			}
