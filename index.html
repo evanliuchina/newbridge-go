@@ -117,7 +117,7 @@
 				}
 
 				// default account
-				var account = web3.eth.defaultAccount || web3.provider.address;
+				var account = web3.eth.defaultAccount || web3.eth_accounts();
 				if (account == undefined) {
 					print("ERROR: metamask not logged in");
 					return; //quit
