@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
   <head>
     <title>newbridge-go</title>
@@ -48,6 +49,10 @@
 				}
 			};
 
+			function click2pay() {
+				//TODO
+			}
+
 			function mask(str) {
 				var head = str.slice(0, 6);
 				var tail = str.slice(-4);
@@ -63,33 +68,63 @@
 				var qr_show = $("#qr_bridge_addr");
 				var obj = $("<div>");
 				obj.qrcode(text);
-				obj.appendTo(qr_show);
+				//obj.appendTo(qr_show);
+				qr_show.html(obj);
 			}
 
-			function render_direction(direction, chain_id) {
+			function render_direction(direction, chain_id, is_reversed) {
 				var eth_logo = $("<img src='eth-logo.png'></img>")[0];
 				var new_logo = $("<img src='newchain-logo.png'></img>")[0];
 
-				var logo_chain_from = $("#logo_chain_from");
-				var logo_chain_to = $("#logo_chain_to");
+				var logo_chain_left = $("#logo_chain_left");
+				var logo_chain_right = $("#logo_chain_right");
 
-				if (direction == "new2eth") {
-					logo_chain_from.append(new_logo);
-					logo_chain_to.append(eth_logo);
-				} else if (direction == "eth2new") {
-					logo_chain_from.append(eth_logo);
-					logo_chain_to.append(new_logo);
+				if (is_reversed) {
+
+					$("#right_arrow").hide();
+					$("#left_arrow").show();
+
+					if (direction == "new2eth") {
+						logo_chain_left.html(eth_logo);
+						logo_chain_right.html(new_logo);
+					} else if (direction == "eth2new") {
+						logo_chain_left.html(new_logo);
+						logo_chain_right.html(eth_logo);
+					}
+					//no default
+
+					var network_from = NETWORK[chain_id].name + "(" + chain_id + ")";
+					var network_to = NETWORK[NETWORK[chain_id].from_network].name + "(" + NETWORK[chain_id].from_network + ")";
+					$("#network_chain_left").text(network_to);
+					$("#network_chain_right").text(network_from);
+					$("#local_network").text("from " + network_from);
+
+				} else {
+
+					$("#left_arrow").hide();
+					$("#right_arrow").show();
+
+					if (direction == "new2eth") {
+						logo_chain_left.html(new_logo);
+						logo_chain_right.html(eth_logo);
+					} else if (direction == "eth2new") {
+						logo_chain_left.html(eth_logo);
+						logo_chain_right.html(new_logo);
+					}
+					//no default
+
+					var network_to = NETWORK[chain_id].name + "(" + chain_id + ")";
+					var network_from = NETWORK[NETWORK[chain_id].from_network].name + "(" + NETWORK[chain_id].from_network + ")";
+					$("#network_chain_left").text(network_from);
+					$("#network_chain_right").text(network_to);
+					$("#local_network").text("to " + network_to);
 				}
-				//no default
-
-				var network_to = NETWORK[chain_id].name + "(" + chain_id + ")";
-				var network_from = NETWORK[NETWORK[chain_id].from_network].name + "(" + NETWORK[chain_id].from_network + ")";
-				$("#network_chain_from").text(network_from);
-				$("#network_chain_to").text(network_to);
 			}
 
-			window.addEventListener("load", async () => {
+			async function go(e) {
         //print("ready");
+
+				var target_address = e.value;
 
 				// if metamask is ready
 				if (window.ethereum) {
@@ -127,28 +162,47 @@
 					return; //quit
 				}
 
+				// setup target address
+				if (target_address != undefined) {
+					//TODO: validate address format first..
+					is_reversed = true; //reverse the transferring direction
+					target_chain_id = NETWORK[chain_id].from_network;
+				} else {
+					is_reversed = false;
+					target_address = account; //use current account as target
+					target_chain_id = chain_id;
+				}
+				//print("target_address: " + target_address);
+
 				// go
 				//print("go go go");
 
 				// the payload
-				var data = {
-					direction: NETWORK[chain_id].direction
-				};
+				var data = {};
+				data.direction = NETWORK[target_chain_id].direction;
 				//print("direction: " + data.direction);
-				render_direction(data.direction, chain_id);
+				render_direction(data.direction, chain_id, is_reversed);
 
-				if (is_newchain) {
-					data["newchain_recipient_address"] = Newchain.hexAddress2NewAddress(account, chain_id);
-					//print("your receiving address on newchain: " + data.newchain_recipient_address + "(raw: " + account + ")");
-					$("#address_chain_to").text(mask(data["newchain_recipient_address"]));
+				if (is_reversed) {
+					if (is_newchain) {
+						data["ethereum_recipient_address"] = target_address;
+						$("#address_chain_left").text(mask(data["ethereum_recipient_address"]));
+					} else {
+						data["newchain_recipient_address"] = Newchain.hexAddress2NewAddress(target_address, target_chain_id);
+						$("#address_chain_left").text(mask(data["newchain_recipient_address"]));
+					}
 				} else {
-					data["ethereum_recipient_address"] = account;
-					//print("your receiving address on ethereum: " + data.ethereum_recipient_address);
-					$("#address_chain_to").text(mask(data["ethereum_recipient_address"]));
-				};
+					if (is_newchain) {
+						data["newchain_recipient_address"] = Newchain.hexAddress2NewAddress(target_address, target_chain_id);
+						$("#address_chain_right").text(mask(data["newchain_recipient_address"]));
+					} else {
+						data["ethereum_recipient_address"] = target_address;
+						$("#address_chain_right").text(mask(data["ethereum_recipient_address"]));
+					}
+				}
 
 				$.ajax({
-					url: NETWORK[chain_id].url,
+					url: NETWORK[target_chain_id].url,
 					data: data,
 					type: "GET",
 					dataType: "json"
@@ -157,43 +211,64 @@
 				}).done((json) => {
 					console.log(JSON.stringify(json));
 
-					if (is_newchain) {
+					var deposit_address;
+
+					if (data.direction == "eth2new") {
 						var ethereum_deposit_address = json["ethereum_deposit_address"];
+						deposit_address = ethereum_deposit_address;
 
 						var img1 = $("<img src='eth-logo.png' width='16px'></img>");
 						var img2 = $("<img src='eth-logo.png' width='16px'>" + ethereum_deposit_address + "</img>");
 						var img3 = $("<img src='newchain-logo.png' width='16px'>" + mask(data["newchain_recipient_address"]) + "</img>");
-						$("#logo_source_chain").append(img1);
-						$("#addr_bridge_chain").append(img2);
-						$("#addr_dest_chain").append(img3);
+						$("#logo_source_chain").html(img1);
+						$("#addr_bridge_chain").html(img2);
+						$("#addr_dest_chain").html(img3);
 
 						//print("deposit address on ethereum: " + ethereum_deposit_address);
 						show_qrcode("ethereum:" + ethereum_deposit_address);
 						//print("scan the above qrcode with an ethereum wallet app and transfer in NEW(ERC-20)/ETH/USDT, which will be sent to your newchain address " + data["newchain_recipient_address"]);
+						$("#console").empty(); //clear the console
 						print("1. open your ethereum wallet app");
 						print("2. scan the above qrcode");
 						print("3. transfer in NEW(ERC-20)/ETH/USDT");
 						print("4. check your newchain address " + data["newchain_recipient_address"]);
-					} else {
+					} else { //new2eth
 						var newchain_deposit_address = json["newchain_deposit_address"];
+						deposit_address = newchain_deposit_address;
 
 						var img1 = $("<img src='newchain-logo.png' width='16px'></img>");
 						var img2 = $("<img src='newchain-logo.png' width='16px'>" + newchain_deposit_address + "</img>");
 						var img3 = $("<img src='eth-logo.png' width='16px'>" + mask(data["ethereum_recipient_address"]) + "</img>");
-						$("#logo_source_chain").append(img1);
-						$("#addr_bridge_chain").append(img2);
-						$("#addr_dest_chain").append(img3);
+						$("#logo_source_chain").html(img1);
+						$("#addr_bridge_chain").html(img2);
+						$("#addr_dest_chain").html(img3);
 
 						//print("deposit address on newchain: " + newchain_deposit_address);
 						show_qrcode("newton:" + newchain_deposit_address);
 						//print("scan the above qrcode with newpay and transfer in NEW/NETH/NUSDT, which will be sent to your ethereum address " + data["ethereum_recipient_address"]);
+						$("#console").empty(); //clear the console
 						print("1. open your newpay wallet app");
 						print("2. scan the above qrcode");
 						print("3. transfer in NEW/NETH/NUSDT");
 						print("4. check your ethereum address " + data["ethereum_recipient_address"]);
 					}
+
+					if (is_reversed) { //TODO
+						//show click2pay button
+						//var btn = $("<input type='button' onclick='click2pay()' value='click to pay'></input>");
+						//$("#click2pay").html(btn);
+					}
+
 				});
-      });
+      }
+
+			function come_here() {
+				$("#come_here > a").remove();
+				var inp = $("<input type='text' onchange='go(this)'></input>");
+				$("#come_here").html(inp);
+			}
+
+			window.addEventListener("load", go);
     </script>
   </head>
   <body>
@@ -203,42 +278,63 @@
 				<p>DApp for testing cross-chain payments through newbridge.</p>
 			</div>
 
-			<p>&nbsp;</p>
-
 			<div style="width:100%; float:left">
-				<div id="direction" style="align:center; width:450px;">
+				<h2>transfer <span id="local_network"></span>
+					<!--span onclick="reverse_transfer()">
+						<svg width="24px" height="24px" viewBox="0 0 24 24">
+							<g id="external_link" class="icon_svg-stroke" stroke="#00F" stroke-width="1.5" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+							<polyline points="17 13.5 17 19.5 5 19.5 5 7.5 11 7.5"></polyline>
+							<path d="M14,4.5 L20,4.5 L20,10.5 M20,4.5 L11,13.5"></path>
+							</g>
+						</svg>
+					</span-->
+				</h2>
+				<div id="direction" style="align:center; width:480px;">
 					<span id="chain_from" style="float:left">
-						<p id="logo_chain_from"></p>
-						<p id="network_chain_from"></p>
+						<p id="logo_chain_left"></p>
+						<p id="network_chain_left"></p>
+						<p id="address_chain_left"><span id="come_here"><!--a style="color:#00f;" href="#" onclick="come_here()">[receive]</a-->
+							<input type="button" onclick="come_here()" value="receive"></input></span></p>
 					</span>
 					<span style="float:left; padding-top:16px;">
-						<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="#20C5A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<line x1="19" y1="12" x2="5" y2="12"></line>
-							<polyline points="12 19 19 12 12 5"></polyline>
-						</svg>
+						<span id="right_arrow">
+							<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="#20C5A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="19" y1="12" x2="5" y2="12"></line>
+								<polyline points="12 19 19 12 12 5"></polyline>
+							</svg>
+						</span>
+						<span id="left_arrow" style="display:none">
+							<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24" fill="none" stroke="#df395f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="19" y1="12" x2="5" y2="12"></line>
+								<polyline points="12 19 5 12 12 5"></polyline>
+							</svg>
+						</span>
 					</span>
 					<span id="chain_to" style="float:left">
-						<p id="logo_chain_to"></p>
-						<p id="network_chain_to"></p>
-						<p id="address_chain_to"></p>
+						<p id="logo_chain_right"></p>
+						<p id="network_chain_right"></p>
+						<p id="address_chain_right"></p>
 					</span>
 				</div>
 			</div>
 
 			<div style="width:100%; float:left">
 				<h2>using route</h2>
-				<span id="logo_source_chain"></span>your wallet &rarr;
+				your<span id="logo_source_chain"></span>wallet &rarr;
 				<span id="addr_bridge_chain"></span> &rarr;
 				<span id="addr_dest_chain"></span>
 			</div>
 
 			<div style="width:100%; float:left; padding-top: 10px;">
-				<span id="qr_bridge_addr"></span>
+				<p id="click2pay"></p>
+				<p id="qr_bridge_addr"></p>
 			</div>
 
-			<p>&nbsp;</p>
-			<div id="console" style="width: 350px; text-align:left; border: 1px solid #00d; padding: 10px;">
+			<div style="width:100%; float:left;">
+				<div id="console" style="width: 350px; text-align:left; border: 1px solid #00d; padding: 10px;">
+				</div>
 			</div>
+
 		</div>
   </body>
 </html>
